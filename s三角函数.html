@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>三角函数可视化 (R=2) & 相位平移</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap");
+
+      body {
+        font-family: "Noto Sans SC", sans-serif;
+        background-color: #f8fafc;
+        touch-action: manipulation; /* 优化移动端触摸 */
+      }
+
+      canvas {
+        touch-action: none; /* 防止画布上的触摸导致页面滚动 */
+      }
+
+      .math-font {
+        font-family: "Roboto Mono", monospace;
+      }
+
+      /* 自定义滚动条 */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+    </style>
+  </head>
+  <body class="text-slate-800">
+    <div class="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
+      <!-- Header -->
+      <header class="text-center mb-6">
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900 mb-2">
+          三角函数交互实验室 (R=2)
+        </h1>
+        <p class="text-slate-600 text-sm md:text-base">
+          拖动圆上的点或直接点击圆周上的锚点。
+        </p>
+      </header>
+
+      <!-- Main Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left: Unit Circle Visualization -->
+        <div
+          class="lg:col-span-7 bg-white rounded-xl shadow-lg border border-slate-200 p-4 flex flex-col items-center relative"
+        >
+          <div
+            class="absolute top-4 left-4 text-xs font-bold bg-slate-100 px-2 py-1 rounded text-slate-500"
+          >
+            R = 2
+          </div>
+          <canvas
+            id="circleCanvas"
+            class="w-full h-auto cursor-crosshair bg-white rounded-lg"
+          ></canvas>
+
+          <!-- Legend -->
+          <div
+            class="flex flex-wrap justify-center gap-4 mt-4 text-sm font-semibold"
+          >
+            <div class="flex items-center">
+              <span class="w-3 h-3 bg-red-500 rounded-full mr-2"></span>sin
+              (对边/y)
+            </div>
+            <div class="flex items-center">
+              <span class="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>cos
+              (邻边/x)
+            </div>
+            <div class="flex items-center">
+              <span class="w-3 h-3 bg-green-500 rounded-full mr-2"></span>tan
+              (切线)
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Data & Controls -->
+        <div class="lg:col-span-5 space-y-4">
+          <!-- Value Panel -->
+          <div class="bg-white rounded-xl shadow border border-slate-200 p-5">
+            <h2 class="text-lg font-bold mb-4 border-b pb-2">当前数值 (R=2)</h2>
+            <div class="grid grid-cols-2 gap-4 text-sm math-font">
+              <div class="bg-slate-50 p-3 rounded">
+                <span class="text-slate-500 block">角度 (Angle)</span>
+                <span id="val-deg" class="text-xl font-bold">30°</span>
+                <span id="val-rad" class="text-slate-400 text-xs ml-2"
+                  >π/6</span
+                >
+              </div>
+              <div class="bg-slate-50 p-3 rounded">
+                <span class="text-slate-500 block">斜边 (Hypotenuse)</span>
+                <span class="text-xl font-bold text-purple-600">2</span>
+              </div>
+              <div class="bg-blue-50 p-3 rounded border-l-4 border-blue-500">
+                <span class="text-blue-600 block">Cos θ (Ratio)</span>
+                <div class="flex justify-between items-baseline">
+                  <span id="val-cos-exact" class="text-xl font-bold">√3/2</span>
+                  <span id="val-cos-dec" class="text-xs text-blue-400"
+                    >≈ 0.866</span
+                  >
+                </div>
+              </div>
+              <div class="bg-red-50 p-3 rounded border-l-4 border-red-500">
+                <span class="text-red-600 block">Sin θ (Ratio)</span>
+                <div class="flex justify-between items-baseline">
+                  <span id="val-sin-exact" class="text-xl font-bold">1/2</span>
+                  <span id="val-sin-dec" class="text-xs text-red-400"
+                    >= 0.500</span
+                  >
+                </div>
+              </div>
+              <div
+                class="bg-green-50 p-3 rounded border-l-4 border-green-500 col-span-2"
+              >
+                <span class="text-green-600 block">Tan θ (Sin/Cos)</span>
+                <div class="flex justify-between items-baseline">
+                  <span id="val-tan-exact" class="text-xl font-bold">√3/3</span>
+                  <span id="val-tan-dec" class="text-xs text-green-600"
+                    >≈ 0.577</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Presets -->
+          <div class="bg-white rounded-xl shadow border border-slate-200 p-5">
+            <h2
+              class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3"
+            >
+              特殊角快速切换 (Rad)
+            </h2>
+            <!-- Adjusted grid to accommodate more buttons -->
+            <div
+              class="grid grid-cols-4 sm:grid-cols-5 gap-2 h-64 overflow-y-auto pr-1 custom-scrollbar"
+            >
+              <!-- Q1 -->
+              <button
+                onclick="setAngle(0)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                0°<br /><span class="text-gray-400 font-normal">0</span>
+              </button>
+              <button
+                onclick="setAngle(30)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                30°<br /><span class="text-gray-400 font-normal">π/6</span>
+              </button>
+              <button
+                onclick="setAngle(45)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                45°<br /><span class="text-gray-400 font-normal">π/4</span>
+              </button>
+              <button
+                onclick="setAngle(60)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                60°<br /><span class="text-gray-400 font-normal">π/3</span>
+              </button>
+              <button
+                onclick="setAngle(90)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                90°<br /><span class="text-gray-400 font-normal">π/2</span>
+              </button>
+
+              <!-- Q2 -->
+              <button
+                onclick="setAngle(120)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                120°<br /><span class="text-gray-400 font-normal">2π/3</span>
+              </button>
+              <button
+                onclick="setAngle(135)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                135°<br /><span class="text-gray-400 font-normal">3π/4</span>
+              </button>
+              <button
+                onclick="setAngle(150)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                150°<br /><span class="text-gray-400 font-normal">5π/6</span>
+              </button>
+              <button
+                onclick="setAngle(180)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                180°<br /><span class="text-gray-400 font-normal">π</span>
+              </button>
+
+              <!-- Q3 -->
+              <button
+                onclick="setAngle(210)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                210°<br /><span class="text-gray-400 font-normal">7π/6</span>
+              </button>
+              <button
+                onclick="setAngle(225)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                225°<br /><span class="text-gray-400 font-normal">5π/4</span>
+              </button>
+              <button
+                onclick="setAngle(240)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                240°<br /><span class="text-gray-400 font-normal">4π/3</span>
+              </button>
+              <button
+                onclick="setAngle(270)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                270°<br /><span class="text-gray-400 font-normal">3π/2</span>
+              </button>
+
+              <!-- Q4 -->
+              <button
+                onclick="setAngle(300)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                300°<br /><span class="text-gray-400 font-normal">5π/3</span>
+              </button>
+              <button
+                onclick="setAngle(315)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                315°<br /><span class="text-gray-400 font-normal">7π/4</span>
+              </button>
+              <button
+                onclick="setAngle(330)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                330°<br /><span class="text-gray-400 font-normal">11π/6</span>
+              </button>
+              <button
+                onclick="setAngle(360)"
+                class="preset-btn py-2 px-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold transition"
+              >
+                360°<br /><span class="text-gray-400 font-normal">2π</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom: Function Graph Section -->
+        <div
+          class="lg:col-span-12 bg-white rounded-xl shadow-lg border border-slate-200 p-5"
+        >
+          <div
+            class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4"
+          >
+            <div>
+              <h2 class="text-lg font-bold">
+                函数图像 & 相位平移 (Phase Shift)
+              </h2>
+              <p class="text-xs text-slate-500">
+                观察不同相位偏移量下的正弦波变化。黑色竖线表示上方圆的当前角度。
+              </p>
+            </div>
+            <!-- Function Toggles -->
+            <div id="func-toggles" class="flex flex-wrap gap-3">
+              <!-- JS will inject checkboxes here -->
+            </div>
+          </div>
+
+          <div class="w-full overflow-x-auto">
+            <canvas
+              id="functionCanvas"
+              class="bg-white rounded border border-slate-100"
+            ></canvas>
+          </div>
+        </div>
+      </div>
+
+      <footer class="text-center text-slate-400 text-xs py-4">
+        Interactive Trigonometry Tool
+      </footer>
+    </div>
+
+    <script>
+      /**
+       * Configuration & State
+       */
+      const state = {
+        angleRad: Math.PI / 6, // Initial: 30 degrees
+        isDragging: false,
+        radiusPixels: 140, // Visual radius in pixels
+        mathRadius: 2, // The mathematical radius defined in prompt
+        canvasPadding: 40,
+      };
+
+      // Global Special Angles (for snapping and visual markers)
+      const specialAngles = [
+        0,
+        Math.PI / 6,
+        Math.PI / 4,
+        Math.PI / 3,
+        Math.PI / 2,
+        (2 * Math.PI) / 3,
+        (3 * Math.PI) / 4,
+        (5 * Math.PI) / 6,
+        Math.PI,
+        (7 * Math.PI) / 6,
+        (5 * Math.PI) / 4,
+        (4 * Math.PI) / 3,
+        (3 * Math.PI) / 2,
+        (5 * Math.PI) / 3,
+        (7 * Math.PI) / 4,
+        (11 * Math.PI) / 6,
+        2 * Math.PI,
+      ];
+
+      // Function Graph Configurations
+      const functionConfigs = [
+        { label: "y = sin(x)", color: "#ef4444", offset: 0, active: true },
+        {
+          label: "y = sin(x + π/6)",
+          color: "#f59e0b",
+          offset: Math.PI / 6,
+          active: false,
+        }, // Orange
+        {
+          label: "y = sin(x + π/2)",
+          color: "#8b5cf6",
+          offset: Math.PI / 2,
+          active: false,
+        }, // Violet
+        {
+          label: "y = sin(x - π/4)",
+          color: "#10b981",
+          offset: -Math.PI / 4,
+          active: false,
+        }, // Teal
+      ];
+
+      // Elements
+      const circleCanvas = document.getElementById("circleCanvas");
+      const circleCtx = circleCanvas.getContext("2d");
+      const funcCanvas = document.getElementById("functionCanvas");
+      const funcCtx = funcCanvas.getContext("2d");
+
+      /**
+       * Initialization
+       */
+      function init() {
+        // 1. Setup Canvas Sizes
+        resizeCanvases();
+        window.addEventListener("resize", () => {
+          resizeCanvases();
+          draw();
+        });
+
+        // 2. Setup Interactions for Circle
+        setupCircleInteractions();
+
+        // 3. Setup Controls for Graphs
+        setupGraphControls();
+
+        // 4. Initial Draw
+        draw();
+      }
+
+      function resizeCanvases() {
+        // Circle Canvas
+        const container = circleCanvas.parentElement;
+        // Fallback to 300 if clientWidth is 0 (e.g. detached/hidden)
+        const containerWidth =
+          container && container.clientWidth > 0 ? container.clientWidth : 300;
+
+        // Make it roughly square but constrained by height
+        // Ensure min size is at least 200 to accommodate padding to avoid negative radius
+        const rawSize = containerWidth - 32;
+        const size = Math.min(Math.max(rawSize, 200), 500);
+
+        circleCanvas.width = size;
+        circleCanvas.height = size;
+
+        // Calculate radius, ensuring it's strictly positive.
+        // Margin of 60 on each side means total 120 padding.
+        state.radiusPixels = Math.max(20, size / 2 - 60);
+
+        // Function Canvas
+        const funcContainer = funcCanvas.parentElement;
+        const funcWidth =
+          funcContainer && funcContainer.clientWidth > 0
+            ? funcContainer.clientWidth
+            : 300;
+
+        funcCanvas.width = funcWidth;
+        funcCanvas.height = 300; // Fixed height
+      }
+
+      function setupGraphControls() {
+        const container = document.getElementById("func-toggles");
+        container.innerHTML = "";
+
+        functionConfigs.forEach((func, index) => {
+          const label = document.createElement("label");
+          label.className = `inline-flex items-center cursor-pointer text-xs md:text-sm p-2 rounded border border-slate-200 hover:bg-slate-50 transition select-none`;
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.className =
+            "form-checkbox h-4 w-4 rounded mr-2 focus:ring-0";
+          checkbox.style.color = func.color;
+          checkbox.checked = func.active;
+
+          checkbox.addEventListener("change", (e) => {
+            functionConfigs[index].active = e.target.checked;
+            drawFunctionGraph();
+          });
+
+          const text = document.createElement("span");
+          text.innerText = func.label;
+          text.style.color = func.color;
+          text.className = "font-bold math-font";
+
+          label.appendChild(checkbox);
+          label.appendChild(text);
+          container.appendChild(label);
+        });
+      }
+
+      /**
+       * Interaction Logic (Circle)
+       */
+      function setupCircleInteractions() {
+        // Mouse
+        circleCanvas.addEventListener("mousedown", startDrag);
+        window.addEventListener("mousemove", drag); // Window listener for smooth dragging outside canvas
+        window.addEventListener("mouseup", endDrag);
+
+        // Touch
+        circleCanvas.addEventListener("touchstart", (e) => {
+          e.preventDefault(); // Prevent scrolling
+          startDrag(e.touches[0]);
+        });
+        window.addEventListener(
+          "touchmove",
+          (e) => {
+            if (state.isDragging) e.preventDefault();
+            drag(e.touches[0]);
+          },
+          { passive: false }
+        );
+        window.addEventListener("touchend", endDrag);
+      }
+
+      function startDrag(e) {
+        const rect = circleCanvas.getBoundingClientRect();
+        const x = e.clientX - rect.left - circleCanvas.width / 2;
+        const y = e.clientY - rect.top - circleCanvas.height / 2;
+        state.isDragging = true;
+        updateAngleFromCoords(x, y);
+      }
+
+      function drag(e) {
+        if (!state.isDragging) return;
+        const rect = circleCanvas.getBoundingClientRect();
+        const x = e.clientX - rect.left - circleCanvas.width / 2;
+        const y = e.clientY - rect.top - circleCanvas.height / 2;
+        updateAngleFromCoords(x, y);
+      }
+
+      function endDrag() {
+        state.isDragging = false;
+      }
+
+      function updateAngleFromCoords(x, y) {
+        let angle = Math.atan2(-y, x);
+        if (angle < 0) angle += 2 * Math.PI;
+
+        // Increased snap threshold for mobile (from 2deg to ~6deg)
+        const snapThreshold = (6 * Math.PI) / 180;
+
+        for (let sa of specialAngles) {
+          // Check for wrap-around case close to 0/2PI
+          let diff = Math.abs(angle - sa);
+          if (diff > Math.PI) diff = 2 * Math.PI - diff; // Handle 359deg vs 1deg
+
+          if (diff < snapThreshold) {
+            angle = sa;
+            break;
+          }
+        }
+
+        state.angleRad = angle;
+        draw();
+      }
+
+      window.setAngle = function (deg) {
+        state.angleRad = deg * (Math.PI / 180);
+        draw();
+      };
+
+      /**
+       * Main Draw Loop
+       */
+      function draw() {
+        drawCircleScene();
+        updatePanel();
+        drawFunctionGraph();
+      }
+
+      /**
+       * Draw Circle Scene
+       */
+      function drawCircleScene() {
+        const r = state.radiusPixels;
+        if (r <= 0) return;
+
+        const ctx = circleCtx;
+        const w = circleCanvas.width;
+        const h = circleCanvas.height;
+        const cx = w / 2;
+        const cy = h / 2;
+        const angle = state.angleRad;
+
+        // Clear
+        ctx.clearRect(0, 0, w, h);
+
+        // 1. Grid & Axes
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "#e2e8f0";
+
+        const gridSize = r / 2;
+        ctx.beginPath();
+        for (let i = -3; i <= 3; i++) {
+          ctx.moveTo(cx + i * gridSize, 0);
+          ctx.lineTo(cx + i * gridSize, h);
+          ctx.moveTo(0, cy + i * gridSize);
+          ctx.lineTo(w, cy + i * gridSize);
+        }
+        ctx.stroke();
+
+        // Main Axes
+        ctx.strokeStyle = "#64748b";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, cy);
+        ctx.lineTo(w, cy); // X axis
+        ctx.moveTo(cx, 0);
+        ctx.lineTo(cx, h); // Y axis
+        ctx.stroke();
+
+        // Axis Labels
+        ctx.fillStyle = "#64748b";
+        ctx.font = "12px sans-serif";
+        ctx.fillText("x", w - 15, cy - 10);
+        ctx.fillText("y", cx + 10, 15);
+
+        // 2. The Circle
+        ctx.beginPath();
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 2;
+        ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+        ctx.stroke();
+
+        // --- NEW: Draw Special Angle Markers (Snap Points) ---
+        ctx.fillStyle = "#cbd5e1"; // Light Slate
+        specialAngles.forEach((sa) => {
+          // skip 2PI to avoid double draw at 0
+          if (sa >= 2 * Math.PI && sa !== 0) return;
+          const sx = cx + r * Math.cos(sa);
+          const sy = cy - r * Math.sin(sa);
+          ctx.beginPath();
+          ctx.arc(sx, sy, 4, 0, 2 * Math.PI); // Small dot
+          ctx.fill();
+        });
+        // ---------------------------------------------------
+
+        // 3. Triangle Calculations
+        const mathCos = Math.cos(angle);
+        const mathSin = Math.sin(angle);
+        const pointX = cx + r * mathCos;
+        const pointY = cy - r * mathSin;
+
+        // 4. Draw Components
+        // A. Cosine Line
+        ctx.beginPath();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#3b82f6";
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(pointX, cy);
+        ctx.stroke();
+
+        // B. Sine Line
+        ctx.beginPath();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#ef4444";
+        ctx.moveTo(pointX, cy);
+        ctx.lineTo(pointX, pointY);
+        ctx.stroke();
+
+        // C. Hypotenuse
+        ctx.beginPath();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#9333ea";
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(pointX, pointY);
+        ctx.stroke();
+
+        // D. Point Marker
+        ctx.beginPath();
+        ctx.fillStyle = "#1e293b";
+        ctx.arc(pointX, pointY, 6, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // E. Tangent Line
+        if (Math.abs(mathCos) > 0.01) {
+          const intersectCanvasX = cx + r / mathCos;
+          ctx.beginPath();
+          ctx.strokeStyle = "#22c55e";
+          ctx.lineWidth = 3;
+          ctx.moveTo(pointX, pointY);
+          ctx.lineTo(intersectCanvasX, cy);
+          ctx.stroke();
+        }
+
+        // 5. Angle Arc & Label
+        ctx.beginPath();
+        ctx.strokeStyle = "#fbbf24";
+        ctx.lineWidth = 2;
+        const arcRad = 30;
+        // Draw arc from 0 to -angle (Canvas Y inverted)
+        ctx.arc(cx, cy, arcRad, 0, -angle, true);
+        ctx.stroke();
+
+        // Draw Angle Text
+        const textAngle = -angle / 2; // Mid-point of the arc (visual angle)
+        const textDist = arcRad + 15; // Distance from center
+        const tx = cx + textDist * Math.cos(textAngle);
+        const ty = cy + textDist * Math.sin(textAngle);
+
+        ctx.fillStyle = "#d97706"; // Darker amber for visibility
+        ctx.font = 'bold 12px "Roboto Mono"';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const degVal = Math.round((angle * 180) / Math.PI);
+        // Handle 360 case to show 0 or 360? Usually 360 if full circle, but clamp for display
+        ctx.fillText((degVal === 360 ? 0 : degVal) + "°", tx, ty);
+
+        // 6. Labels
+        drawSceneLabels(ctx, cx, cy, pointX, pointY, r, angle);
+      }
+
+      function drawSceneLabels(ctx, cx, cy, px, py, r, angle) {
+        ctx.fillStyle = "#1e293b";
+        ctx.font = 'bold 14px "Roboto Mono"';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const midX = (cx + px) / 2;
+        const midY = (cy + py) / 2;
+        ctx.fillStyle = "#7e22ce";
+        ctx.fillText(
+          "2",
+          midX - 10 * Math.sin(angle),
+          midY - 10 * Math.cos(angle)
+        );
+        ctx.fillStyle = "#1d4ed8";
+        ctx.fillText(
+          formatLabelValue(2 * Math.cos(angle)),
+          (cx + px) / 2,
+          cy + 15
+        );
+        ctx.fillStyle = "#b91c1c";
+        ctx.fillText(
+          formatLabelValue(2 * Math.sin(angle)),
+          px + (Math.cos(angle) > 0 ? 15 : -15),
+          (cy + py) / 2
+        );
+      }
+
+      function formatLabelValue(val) {
+        const epsilon = 0.05;
+        const absVal = Math.abs(val);
+        const sign = val < -epsilon ? "-" : "";
+        if (Math.abs(absVal - 0) < epsilon) return "0";
+        if (Math.abs(absVal - 1) < epsilon) return sign + "1";
+        if (Math.abs(absVal - 2) < epsilon) return sign + "2";
+        if (Math.abs(absVal - 1.732) < epsilon) return sign + "√3";
+        if (Math.abs(absVal - 1.414) < epsilon) return sign + "√2";
+        return sign + absVal.toFixed(1);
+      }
+
+      function getExactText(val, type) {
+        // Ensure angle is positive for lookup
+        let angle = state.angleRad % (2 * Math.PI);
+        if (angle < 0) angle += 2 * Math.PI;
+
+        // Round to nearest int to avoid float errors
+        let deg = Math.round((angle * 180) / Math.PI);
+        // 360 map to 0
+        if (deg === 360) deg = 0;
+
+        // Full lookup table for all quadrants
+        const exacts = {
+          0: { sin: "0", cos: "1", tan: "0" },
+          30: { sin: "1/2", cos: "√3/2", tan: "√3/3" },
+          45: { sin: "√2/2", cos: "√2/2", tan: "1" },
+          60: { sin: "√3/2", cos: "1/2", tan: "√3" },
+          90: { sin: "1", cos: "0", tan: "∞" },
+
+          120: { sin: "√3/2", cos: "-1/2", tan: "-√3" },
+          135: { sin: "√2/2", cos: "-√2/2", tan: "-1" },
+          150: { sin: "1/2", cos: "-√3/2", tan: "-√3/3" },
+          180: { sin: "0", cos: "-1", tan: "0" },
+
+          210: { sin: "-1/2", cos: "-√3/2", tan: "√3/3" },
+          225: { sin: "-√2/2", cos: "-√2/2", tan: "1" },
+          240: { sin: "-√3/2", cos: "-1/2", tan: "√3" },
+          270: { sin: "-1", cos: "0", tan: "-∞" },
+
+          300: { sin: "-√3/2", cos: "1/2", tan: "-√3" },
+          315: { sin: "-√2/2", cos: "√2/2", tan: "-1" },
+          330: { sin: "-1/2", cos: "√3/2", tan: "-√3/3" },
+        };
+
+        let res = { ex: "", val: "" };
+
+        // Raw value calc (range [-1, 1])
+        let raw = 0;
+        if (type === "sin") raw = Math.sin(state.angleRad);
+        if (type === "cos") raw = Math.cos(state.angleRad);
+        if (type === "tan") raw = Math.tan(state.angleRad);
+        res.val = raw.toFixed(3);
+
+        // Exact value lookup
+        if (exacts[deg]) {
+          res.ex = exacts[deg][type];
+        } else {
+          res.ex = raw.toFixed(3);
+        }
+
+        return res;
+      }
+
+      // Helper to calculate GCD
+      function getGCD(a, b) {
+        return b === 0 ? a : getGCD(b, a % b);
+      }
+
+      // Helper to format Radians as fraction
+      function formatRadian(angle) {
+        if (Math.abs(angle) < 0.0001) return "0";
+
+        // Check against standard denominator 12 (covers /2, /3, /4, /6)
+        const exactTwelfths = angle / (Math.PI / 12);
+        const roundedTwelfths = Math.round(exactTwelfths);
+
+        // Check if close enough to special angle
+        if (Math.abs(exactTwelfths - roundedTwelfths) < 0.01) {
+          if (roundedTwelfths === 0) return "0";
+
+          const gcd = getGCD(Math.abs(roundedTwelfths), 12);
+          const num = roundedTwelfths / gcd;
+          const den = 12 / gcd;
+
+          let numStr = num === 1 ? "" : num === -1 ? "-" : num;
+
+          if (den === 1) return numStr + "π";
+          return `${numStr}π/${den}`;
+        }
+
+        return (angle / Math.PI).toFixed(2) + "π";
+      }
+
+      function updatePanel() {
+        const deg = (state.angleRad * 180) / Math.PI;
+        document.getElementById("val-deg").innerText = Math.round(deg) + "°";
+        document.getElementById("val-rad").innerText = formatRadian(
+          state.angleRad
+        );
+
+        const s = getExactText(null, "sin");
+        const c = getExactText(null, "cos");
+        const t = getExactText(null, "tan");
+
+        document.getElementById("val-sin-exact").innerText = s.ex;
+        document.getElementById("val-sin-dec").innerText = s.val;
+        document.getElementById("val-cos-exact").innerText = c.ex;
+        document.getElementById("val-cos-dec").innerText = c.val;
+        document.getElementById("val-tan-exact").innerText = t.ex;
+        document.getElementById("val-tan-dec").innerText = t.val;
+      }
+
+      /**
+       * Draw Function Graph (OPTIMIZED)
+       */
+      function drawFunctionGraph() {
+        const ctx = funcCtx;
+        const w = funcCanvas.width;
+        const h = funcCanvas.height;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Settings
+        const viewWidthRad = 3 * Math.PI; // Show 3 PI width
+        const pixelsPerRad = w / viewWidthRad;
+        const centerY = h / 2;
+        const scaleY = 80; // 1 unit = 80px
+
+        // 1. Grid System
+        ctx.beginPath();
+        ctx.lineWidth = 1;
+
+        // Horizontal Grid Lines (+1, +0.5, -0.5, -1)
+        const ySteps = [1, 0.5, -0.5, -1];
+        ySteps.forEach((step) => {
+          let y = centerY - step * scaleY;
+          // Make 1.0 lines darker, 0.5 lines lighter
+          if (Math.abs(step) === 1) ctx.strokeStyle = "#e2e8f0";
+          else ctx.strokeStyle = "#f8fafc";
+
+          ctx.moveTo(0, y);
+          ctx.lineTo(w, y);
+          ctx.stroke();
+          ctx.beginPath(); // Reset path for color change to work
+        });
+
+        // Vertical Grid Lines (PI/4 steps)
+        const xStep = Math.PI / 4;
+        for (let r = 0; r <= viewWidthRad; r += xStep) {
+          let x = r * pixelsPerRad;
+          ctx.beginPath();
+          // Major lines at PI/2, minor at PI/4
+          if (r % (Math.PI / 2) < 0.01) ctx.strokeStyle = "#e2e8f0";
+          else ctx.strokeStyle = "#f8fafc";
+
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, h);
+          ctx.stroke();
+        }
+
+        // 2. Main Axes (Stronger)
+        ctx.beginPath();
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 2;
+        // X-Axis
+        ctx.moveTo(0, centerY);
+        ctx.lineTo(w, centerY);
+        // Y-Axis
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, h);
+        ctx.stroke();
+
+        // 3. Axis Labels
+        ctx.fillStyle = "#64748b";
+        ctx.font = "12px 'Roboto Mono', monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+
+        // X Labels (Using PI)
+        for (let r = 0; r <= viewWidthRad; r += Math.PI / 2) {
+          let x = r * pixelsPerRad;
+          let label = getPiLabel(r);
+          ctx.fillText(label, x, centerY + 8);
+
+          // Tick mark
+          ctx.beginPath();
+          ctx.strokeStyle = "#94a3b8";
+          ctx.lineWidth = 2;
+          ctx.moveTo(x, centerY - 4);
+          ctx.lineTo(x, centerY + 4);
+          ctx.stroke();
+        }
+
+        // Y Labels
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#64748b";
+        ctx.fillText("1", 6, centerY - scaleY);
+        ctx.fillText("-1", 6, centerY + scaleY);
+
+        // 4. Draw Functions
+        functionConfigs.forEach((func) => {
+          if (!func.active) return;
+
+          ctx.beginPath();
+          ctx.strokeStyle = func.color;
+          ctx.lineWidth = 3; // Thicker lines
+          ctx.lineJoin = "round";
+          ctx.lineCap = "round";
+
+          ctx.moveTo(0, centerY - Math.sin(func.offset) * scaleY);
+
+          // Sampling every 2 pixels for smoothness
+          for (let px = 0; px <= w; px += 2) {
+            const rad = px / pixelsPerRad;
+            const val = Math.sin(rad + func.offset);
+            const py = centerY - val * scaleY;
+            ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+        });
+
+        // 5. Interactive Indicator
+        const currentRad = state.angleRad % (2 * Math.PI);
+        const xPos = currentRad * pixelsPerRad;
+        const xPos2 = (currentRad + 2 * Math.PI) * pixelsPerRad; // Wrap around phantom
+
+        // Draw vertical marker line
+        ctx.beginPath();
+        ctx.strokeStyle = "#475569";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]); // Dashed Line
+
+        // Primary line
+        ctx.moveTo(xPos, 0);
+        ctx.lineTo(xPos, h);
+        // Secondary wrap-around line (if visible)
+        if (xPos2 < w) {
+          ctx.moveTo(xPos2, 0);
+          ctx.lineTo(xPos2, h);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset
+
+        // Draw Intersection Points with Glow
+        functionConfigs.forEach((func) => {
+          if (!func.active) return;
+
+          // Primary Point
+          drawGlowPoint(
+            ctx,
+            xPos,
+            centerY - Math.sin(currentRad + func.offset) * scaleY,
+            func.color
+          );
+
+          // Secondary Point
+          if (xPos2 < w) {
+            drawGlowPoint(
+              ctx,
+              xPos2,
+              centerY -
+                Math.sin(currentRad + 2 * Math.PI + func.offset) * scaleY,
+              func.color
+            );
+          }
+        });
+      }
+
+      function drawGlowPoint(ctx, x, y, color) {
+        // Glow effect (semi-transparent halo)
+        ctx.beginPath();
+        ctx.fillStyle = color + "40"; // Hex opacity ~25%
+        ctx.arc(x, y, 8, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Solid center
+        ctx.beginPath();
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      function getPiLabel(rad) {
+        if (rad === 0) return "0";
+        const epsilon = 0.1;
+        // Normalized to PI/2 steps
+        const k = Math.round(rad / (Math.PI / 2));
+
+        if (k % 2 === 0) {
+          // Full PI integers (1π, 2π, 3π)
+          const n = k / 2;
+          return n === 1 ? "π" : n + "π";
+        } else {
+          // Halves (π/2, 3π/2, 5π/2)
+          return k === 1 ? "π/2" : k + "π/2";
+        }
+      }
+
+      // Start
+      init();
+    </script>
+  </body>
+</html>
